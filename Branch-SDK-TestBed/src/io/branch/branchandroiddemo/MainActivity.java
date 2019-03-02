@@ -1,15 +1,24 @@
 package io.branch.branchandroiddemo;
 
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 import android.widget.ToggleButton;
 
 import org.json.JSONException;
@@ -21,6 +30,7 @@ import io.branch.indexing.BranchUniversalObject;
 import io.branch.referral.Branch;
 import io.branch.referral.Branch.BranchReferralInitListener;
 import io.branch.referral.Branch.BranchReferralStateChangedListener;
+import io.branch.referral.BranchContentUrlBuilder;
 import io.branch.referral.BranchError;
 import io.branch.referral.BranchViewHandler;
 import io.branch.referral.Defines;
@@ -378,6 +388,13 @@ public class MainActivity extends Activity {
             }
         });
 
+        findViewById(R.id.create_notification).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                createNotification();
+            }
+        });
+
         ((ToggleButton) findViewById(R.id.tracking_cntrl_btn)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -395,6 +412,7 @@ public class MainActivity extends Activity {
         branch.initSession(new Branch.BranchUniversalReferralInitListener() {
             @Override
             public void onInitFinished(BranchUniversalObject branchUniversalObject, LinkProperties linkProperties, BranchError error) {
+                Toast.makeText(MainActivity.this,"InitSession called",Toast.LENGTH_LONG).show();
                 if (error != null) {
                     Log.i("BranchTestBed", "branch init failed. Caused by -" + error.getMessage());
                 } else {
@@ -431,6 +449,15 @@ public class MainActivity extends Activity {
     @Override
     public void onNewIntent(Intent intent) {
         this.setIntent(intent);
+
+        branch.reInitSession(this, new BranchReferralInitListener() {
+            @Override
+            public void onInitFinished(JSONObject referringParams, BranchError error) {
+                Log.d("ReinitTest", "reInitSession called");
+                Toast.makeText(MainActivity.this,"reInitSession called" + referringParams.optString("time"),Toast.LENGTH_LONG).show();
+            }
+        });
+
     }
 
     @Override
@@ -445,4 +472,44 @@ public class MainActivity extends Activity {
             startActivity(i);
         }
     }
+
+
+    public void createNotification() {
+
+        NotificationManager mNotificationManager;
+
+        NotificationCompat.Builder mBuilder =
+                new NotificationCompat.Builder(this.getApplicationContext(), "notify_001");
+        Intent ii = new Intent(this.getApplicationContext(), MainActivity.class);
+        ii.putExtra("branch",new BranchContentUrlBuilder(this, "test").addParameters("time", System.currentTimeMillis()).getContentUrl());
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, ii, 0);
+
+        NotificationCompat.BigTextStyle bigText = new NotificationCompat.BigTextStyle();
+        bigText.bigText("click me");
+        bigText.setBigContentTitle("Re init test");
+        bigText.setSummaryText("Text in detail");
+
+        mBuilder.setContentIntent(pendingIntent);
+        mBuilder.setSmallIcon(R.drawable.ic_launcher);
+        mBuilder.setContentTitle("Your Title");
+        mBuilder.setContentText("Your text");
+        mBuilder.setPriority(Notification.PRIORITY_MAX);
+        mBuilder.setStyle(bigText);
+
+        mNotificationManager =
+                (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            String channelId = "YOUR_CHANNEL_ID";
+            NotificationChannel channel = new NotificationChannel(channelId,
+                    "Channel human readable title",
+                    NotificationManager.IMPORTANCE_DEFAULT);
+            mNotificationManager.createNotificationChannel(channel);
+            mBuilder.setChannelId(channelId);
+        }
+
+        mNotificationManager.notify(0, mBuilder.build());
+
+    }
+
 }
